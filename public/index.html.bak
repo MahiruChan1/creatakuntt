@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cmail - Full Content</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Outfit', sans-serif; margin: 0; overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+        #particles-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+        .loader-btn { border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid #ffffff; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #history-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Style untuk konten email biar gak berantakan */
+        #modal-body img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; }
+        #modal-body a { color: #4f46e5; text-decoration: underline; }
+        #modal-body pre { background: #f3f4f6; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: { colors: { dark: '#0f172a', card: '#1e293b', primary: '#6366f1' } }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark text-white min-h-screen flex flex-col items-center p-4 relative">
+
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="w-full max-w-3xl z-20 flex justify-between items-center mb-6 mt-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-primary to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-paper-plane text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold">Cmail</h1>
+        </div>
+        <button onclick="toggleHistory()" class="bg-card hover:bg-gray-700 border border-gray-700 text-gray-300 px-4 py-2 rounded-xl text-sm font-medium transition-colors">
+            <i class="fa-solid fa-clock-rotate-left mr-2"></i> History
+        </button>
+    </div>
+
+    <div class="w-full max-w-3xl z-10 animate-slide-in relative">
+        
+        <div class="bg-card/90 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-gray-700/50 mb-6">
+            <div class="flex flex-col md:flex-row gap-3">
+                <div class="flex-1 relative">
+                    <input type="text" id="email-address" readonly 
+                        class="w-full bg-gray-900/80 border border-gray-600 text-gray-200 text-lg px-4 py-3 rounded-xl focus:outline-none focus:border-primary font-mono"
+                        placeholder="..." value="">
+                    <button onclick="copyEmail()" class="absolute right-2 top-2 bottom-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 rounded-lg" title="Copy">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+                <button onclick="createNewEmail()" id="btn-new" class="bg-primary hover:bg-primary/80 text-white px-6 py-3 rounded-xl font-medium shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-rotate"></i> Change Email
+                </button>
+            </div>
+            
+            <div class="mt-3 flex justify-between items-center text-xs text-gray-400 font-mono">
+                <span class="text-green-400 flex items-center gap-2">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    Live Sync (1s)
+                </span>
+                <span id="status-text" class="text-gray-500 transition-opacity duration-500">Ready</span>
+            </div>
+        </div>
+
+        <div class="bg-card/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50 overflow-hidden min-h-[500px] flex flex-col">
+            <div class="p-4 border-b border-gray-700/50 flex justify-between items-center bg-gray-800/40">
+                <div class="flex items-center gap-3">
+                    <h2 class="font-semibold text-gray-200 text-sm uppercase tracking-wider">Inbox</h2>
+                    <button onclick="manualRefresh()" id="btn-refresh" class="text-gray-400 hover:text-white p-1.5 rounded-lg transition-colors"><i class="fa-solid fa-arrows-rotate"></i></button>
+                </div>
+                <span id="msg-count" class="bg-primary text-white px-2 py-0.5 rounded-md text-xs font-bold">0</span>
+            </div>
+
+            <div id="email-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                </div>
+        </div>
+    </div>
+
+    <div id="history-overlay" onclick="toggleHistory()" class="fixed inset-0 bg-black/60 z-40 hidden transition-opacity opacity-0 backdrop-blur-sm"></div>
+    <div id="history-sidebar" class="fixed top-0 right-0 h-full w-80 bg-card border-l border-gray-700 z-50 transform translate-x-full shadow-2xl flex flex-col">
+        <div class="p-5 border-b border-gray-700 flex justify-between items-center bg-gray-900/50">
+            <h3 class="font-bold text-lg">History</h3>
+            <button onclick="toggleHistory()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="history-list"></div>
+        <div class="p-4 border-t border-gray-700 bg-gray-900/30">
+            <button onclick="clearHistory()" class="w-full py-2 text-xs text-red-400 hover:text-red-300 border border-red-900/50 rounded">Clear History</button>
+        </div>
+    </div>
+
+    <div id="email-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300 p-4">
+        <div class="bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-700 transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]" id="modal-content">
+            <div class="p-5 border-b border-gray-700 flex justify-between items-start bg-gray-800/50 rounded-t-2xl">
+                <div>
+                    <h3 id="modal-subject" class="text-lg font-bold text-white mb-1 line-clamp-2">Subject</h3>
+                    <div class="flex flex-col gap-1 text-sm text-gray-400">
+                         <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-user"></i>
+                            <span id="modal-sender">...</span>
+                         </div>
+                         <div class="flex items-center gap-2 text-xs opacity-70">
+                            <i class="fa-regular fa-clock"></i>
+                            <span id="modal-time">...</span>
+                         </div>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-700 text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 bg-white text-gray-900 rounded-b-xl">
+                <div id="modal-body" class="prose prose-sm max-w-none break-words">
+                    </div>
+                
+                <div class="mt-8 border-t border-gray-200 pt-4">
+                    <details class="group">
+                        <summary class="flex justify-between items-center font-medium cursor-pointer list-none text-gray-500 text-xs uppercase tracking-wider hover:text-indigo-600">
+                            <span><i class="fa-solid fa-code mr-2"></i> Troubleshooting / Raw Data</span>
+                            <span class="transition group-open:rotate-180"><i class="fa-solid fa-chevron-down"></i></span>
+                        </summary>
+                        <div class="text-gray-600 mt-2 bg-gray-100 p-3 rounded text-xs font-mono overflow-auto max-h-40 whitespace-pre-wrap" id="modal-raw">
+                            </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/tempmail';
+        let currentEmail = localStorage.getItem('cmail_address') || '';
+        let pollingInterval = null;
+        let lastRenderedData = ""; 
+        let fetchController = null;
+        
+        // GLOBAL VARIABLE UNTUK MENYIMPAN PESAN (PENTING)
+        let inboxData = []; 
+
+        function renderInbox(messages) {
+            const listContainer = document.getElementById('email-list');
+            const countElem = document.getElementById('msg-count');
+            
+            if (!Array.isArray(messages)) messages = [];
+            
+            // SIMPAN KE GLOBAL VAR (Biar bisa dibuka modalnya dgn aman)
+            inboxData = messages; 
+
+            countElem.innerText = messages.length;
+
+            const currentDataSignature = JSON.stringify(messages.map(m => m.id));
+            if (currentDataSignature === lastRenderedData) return;
+            lastRenderedData = currentDataSignature;
+
+            if (messages.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500 opacity-60 mt-20">
+                        <div class="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4"><i class="fa-solid fa-satellite-dish text-2xl"></i></div>
+                        <p>Waiting for messages...</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            messages.forEach(msg => {
+                // Fallback untuk nama pengirim
+                const fromName = msg.from?.name || msg.from?.address || 'Unknown';
+                const subject = msg.subject || '(No Subject)';
+                const intro = msg.intro || msg.text || '...'; // Pake text kalau intro kosong
+                
+                let timeStr = 'Now';
+                if(msg.created_at) {
+                    const dateObj = new Date(msg.created_at * 1000);
+                    timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+
+                // PENTING: Kita kirim ID saja, bukan object (biar gak error quote)
+                html += `
+                <div onclick="openEmail('${msg.id}')" 
+                     class="bg-gray-800/40 hover:bg-gray-700/60 p-4 rounded-xl cursor-pointer transition-all border border-gray-700/50 hover:border-primary/50 group animate-slide-in mb-3 flex gap-3 items-start">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex-shrink-0 flex items-center justify-center text-primary font-bold shadow-inner">
+                        ${fromName[0] ? fromName[0].toUpperCase() : '?'}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-start mb-0.5">
+                            <span class="font-bold text-gray-200 group-hover:text-primary transition-colors truncate text-sm max-w-[70%]">${fromName}</span>
+                            <span class="text-[10px] text-gray-500 bg-gray-900/80 px-2 py-0.5 rounded whitespace-nowrap">${timeStr}</span>
+                        </div>
+                        <div class="font-medium text-gray-300 text-sm truncate leading-tight mb-1">${subject}</div>
+                        <div class="text-gray-500 text-xs truncate leading-tight opacity-80">${intro.substring(0, 50)}...</div>
+                    </div>
+                </div>`;
+            });
+            listContainer.innerHTML = html;
+        }
+
+        async function checkInbox() {
+            if (!currentEmail) return;
+            if (fetchController) fetchController.abort();
+            fetchController = new AbortController();
+
+            try {
+                const res = await fetch(`${API_BASE}/inbox/${currentEmail}`, { signal: fetchController.signal });
+                if (!res.ok) throw new Error("API Error");
+                const messages = await res.json();
+                
+                const time = new Date();
+                document.getElementById('status-text').innerText = `Updated: ${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`;
+                
+                renderInbox(messages);
+            } catch (e) {
+                if (e.name !== 'AbortError') console.error("Inbox Error:", e);
+            }
+        }
+
+        function stopEverything() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (fetchController) fetchController.abort();
+            pollingInterval = null; fetchController = null;
+        }
+
+        async function createNewEmail() {
+            const btn = document.getElementById('btn-new');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loader-btn"></span>'; btn.disabled = true;
+
+            try {
+                stopEverything();
+                lastRenderedData = ""; 
+                document.getElementById('email-list').innerHTML = '';
+                document.getElementById('msg-count').innerText = '0';
+                document.getElementById('email-address').value = "Generating...";
+
+                const res = await fetch(`${API_BASE}/create`);
+                const data = await res.json();
+                
+                if (data.email) {
+                    currentEmail = data.email;
+                    localStorage.setItem('cmail_address', currentEmail);
+                    addToHistory(currentEmail);
+                    updateEmailDisplay();
+                    startInboxPolling();
+                } else { throw new Error("No email returned"); }
+            } catch (e) {
+                alert("Gagal membuat email baru.");
+                updateEmailDisplay(); 
+            } finally {
+                btn.innerHTML = originalText; btn.disabled = false;
+            }
+        }
+
+        function restoreSession(email) {
+            if(email === currentEmail) { toggleHistory(); return; }
+            stopEverything();
+            currentEmail = email;
+            localStorage.setItem('cmail_address', email);
+            lastRenderedData = "";
+            updateEmailDisplay();
+            toggleHistory(); 
+            document.getElementById('email-list').innerHTML = ''; 
+            document.getElementById('msg-count').innerText = '0';
+            startInboxPolling();
+            renderHistory();
+        }
+
+        function startInboxPolling() {
+            stopEverything();
+            checkInbox();
+            pollingInterval = setInterval(checkInbox, 1000);
+        }
+
+        async function manualRefresh() {
+            const btn = document.getElementById('btn-refresh');
+            if (btn.querySelector('.fa-spin')) return;
+            btn.children[0].classList.add('fa-spin');
+            lastRenderedData = ""; 
+            await checkInbox();
+            setTimeout(() => btn.children[0].classList.remove('fa-spin'), 500);
+        }
+
+        function updateEmailDisplay() {
+            document.getElementById('email-address').value = currentEmail || '';
+            if(!currentEmail) createNewEmail();
+        }
+
+        function copyEmail() {
+            const input = document.getElementById('email-address');
+            if (!input.value || input.value === 'Generating...') return;
+            navigator.clipboard.writeText(input.value);
+            const btn = document.querySelector('button[title="Copy"]');
+            btn.innerHTML = '<i class="fa-solid fa-check text-green-400"></i>';
+            setTimeout(() => btn.innerHTML = '<i class="fa-regular fa-copy"></i>', 2000);
+        }
+
+        // --- HISTORY LOGIC ---
+        function getHistory() { return JSON.parse(localStorage.getItem('cmail_history') || '[]'); }
+        function addToHistory(email) {
+            let history = getHistory().filter(item => item.email !== email);
+            history.unshift({ email: email, date: new Date().getTime() });
+            if(history.length > 10) history.pop();
+            localStorage.setItem('cmail_history', JSON.stringify(history));
+            renderHistory();
+        }
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            const history = getHistory();
+            if(history.length === 0) { list.innerHTML = `<p class="text-gray-500 text-center text-sm mt-10">Empty History</p>`; return; }
+            let html = '';
+            history.forEach(item => {
+                const date = new Date(item.date);
+                const isActive = item.email === currentEmail ? 'border-primary bg-primary/10' : 'border-gray-700 bg-gray-800/50 hover:bg-gray-700';
+                html += `<div onclick="restoreSession('${item.email}')" class="cursor-pointer p-3 rounded-xl border ${isActive} transition-all mb-2"><div class="text-xs text-gray-500 mb-1 flex justify-between"><span>${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>${item.email === currentEmail ? '<span class="text-primary font-bold">ACTIVE</span>' : ''}</div><div class="text-sm font-mono text-gray-300 break-all">${item.email}</div></div>`;
+            });
+            list.innerHTML = html;
+        }
+        function clearHistory() { if(confirm('Hapus history?')) { localStorage.removeItem('cmail_history'); renderHistory(); } }
+        function toggleHistory() {
+            const sidebar = document.getElementById('history-sidebar');
+            const overlay = document.getElementById('history-overlay');
+            if (sidebar.classList.contains('translate-x-full')) { renderHistory(); sidebar.classList.remove('translate-x-full'); overlay.classList.remove('hidden'); setTimeout(() => overlay.classList.remove('opacity-0'), 10); } 
+            else { sidebar.classList.add('translate-x-full'); overlay.classList.add('opacity-0'); setTimeout(() => overlay.classList.add('hidden'), 300); }
+        }
+
+        // --- MODAL & PARTICLES (PERBAIKAN UTAMA) ---
+        function openEmail(id) {
+            // Cari pesan dari Global Variable (lebih aman daripada passing di HTML)
+            const msg = inboxData.find(m => m.id === id);
+            
+            if (!msg) {
+                alert("Pesan tidak ditemukan di memori.");
+                return;
+            }
+
+            const modal = document.getElementById('email-modal');
+            const content = document.getElementById('modal-content');
+            
+            // Set Header
+            document.getElementById('modal-subject').innerText = msg.subject || '(No Subject)';
+            document.getElementById('modal-sender').innerText = msg.from?.address || msg.from?.name || 'Unknown';
+            
+            if(msg.created_at) {
+                const d = new Date(msg.created_at * 1000);
+                document.getElementById('modal-time').innerText = d.toLocaleString();
+            }
+
+            // Set Body (CARI SEMUA KEMUNGKINAN ISI)
+            // Urutan prioritas: body_html -> html -> body_text -> text -> intro
+            const bodyContent = msg.body_html || msg.html || msg.body_text || msg.text || `<p>${msg.intro}</p>` || '<p class="text-center text-gray-500 italic">No content available (empty).</p>';
+            
+            document.getElementById('modal-body').innerHTML = bodyContent;
+
+            // Set Raw Data (Untuk Debugging)
+            document.getElementById('modal-raw').innerText = JSON.stringify(msg, null, 2);
+
+            modal.classList.remove('hidden'); 
+            setTimeout(() => { modal.classList.remove('opacity-0'); content.classList.remove('scale-95'); content.classList.add('scale-100'); }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('email-modal');
+            const content = document.getElementById('modal-content');
+            modal.classList.add('opacity-0'); content.classList.remove('scale-100'); content.classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        // Particles
+        const canvas = document.getElementById('particles-canvas'); const ctx = canvas.getContext('2d'); let particles = [];
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
+        class Particle { constructor() { this.x=Math.random()*canvas.width; this.y=Math.random()*canvas.height; this.size=Math.random()*2; this.vx=(Math.random()-.5)*0.5; this.vy=(Math.random()-.5)*0.5; } update() { this.x+=this.vx; this.y+=this.vy; if(this.x<0||this.x>canvas.width)this.vx*=-1; if(this.y<0||this.y>canvas.height)this.vy*=-1; } draw() { ctx.fillStyle='rgba(99,102,241,0.3)'; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); } }
+        for(let i=0;i<50;i++) particles.push(new Particle());
+        function animate() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{p.update();p.draw();}); requestAnimationFrame(animate); } animate();
+
+        // INIT
+        window.addEventListener('DOMContentLoaded', () => {
+            if (currentEmail) { updateEmailDisplay(); startInboxPolling(); addToHistory(currentEmail); } 
+            else { createNewEmail(); }
+        });
+        document.getElementById('email-modal').addEventListener('click', (e) => { if (e.target.id === 'email-modal') closeModal(); });
+    </script>
+</body>
+</html>
